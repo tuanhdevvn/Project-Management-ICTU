@@ -10,7 +10,7 @@
 
 ## 1. Quy ước
 
-- Xác thực: tiêu đề `Authorization: Bearer <jwt>`, trừ đăng ký và đăng nhập.
+- Xác thực: tiêu đề `Authorization: Bearer <jwt>`, trừ đăng nhập.
 - Thời gian trong JSON dùng ISO-8601.
 - Danh sách dùng phân trang query `page` (bắt đầu từ 1) và `pageSize` (mặc định 20, tối đa 100).
 - Phản hồi danh sách:
@@ -29,22 +29,7 @@ Ngày nghiệp vụ gửi dạng `YYYY-MM-DD`.
 
 ## 2. Auth
 
-### POST `/api/auth/register`
-
-Không cần token.
-
-Yêu cầu:
-
-```json
-{
-  "fullName": "Nguyễn Văn A",
-  "email": "a@ictu.edu.vn",
-  "password": "Matkhau12",
-  "confirmPassword": "Matkhau12"
-}
-```
-
-Phản hồi `201`: `{ "data": { "id", "fullName", "email" } }`.
+Không có `POST /api/auth/register`. Khách không tự tạo tài khoản.
 
 ### POST `/api/auth/login`
 
@@ -63,7 +48,8 @@ Phản hồi `200`:
       "id": "uuid",
       "fullName": "Nguyễn Văn A",
       "email": "a@ictu.edu.vn",
-      "systemRole": "USER"
+      "systemRole": "USER",
+      "mustChangePassword": true
     }
   }
 }
@@ -83,7 +69,9 @@ Trả hồ sơ người dùng hiện tại.
 }
 ```
 
-Phản hồi `204` khi thành công.
+Phản hồi `204` khi thành công. Lần đổi mật khẩu này tắt `mustChangePassword`.
+
+Khi `mustChangePassword` đang bật, mọi API nghiệp vụ ngoài `GET /api/auth/me` và `POST /api/auth/change-password` trả `403` với mã `PASSWORD_CHANGE_REQUIRED`.
 
 ## 3. Người dùng
 
@@ -92,8 +80,21 @@ Chỉ `ADMIN`.
 | Phương thức | Đường dẫn | Mục đích |
 | --- | --- | --- |
 | GET | `/api/users?q=&page=&pageSize=` | Tìm theo tên hoặc email |
+| POST | `/api/users` | Cấp tài khoản nhân viên |
 | PATCH | `/api/users/{id}/status` | Body `{ "status": "LOCKED" }` hoặc `ACTIVE` |
 | PATCH | `/api/users/{id}/role` | Body `{ "systemRole": "ADMIN" }` hoặc `USER` |
+
+Cấp tài khoản:
+
+```json
+{
+  "fullName": "Nguyễn Văn A",
+  "email": "a@ictu.edu.vn",
+  "temporaryPassword": "Matkhau12"
+}
+```
+
+Phản hồi `201`: `{ "data": { "id", "fullName", "email", "systemRole": "USER", "status": "ACTIVE", "mustChangePassword": true } }`. Không trả mật khẩu. Email đã tồn tại thì `409`.
 
 ## 4. Dự án
 

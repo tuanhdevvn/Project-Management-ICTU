@@ -17,7 +17,7 @@ Trong phạm vi:
 - Ca sử dụng UC-01 đến UC-15.
 - Phân quyền tại API, không chỉ trên giao diện.
 - Bền vững dữ liệu sau khi tắt và bật container.
-- Cổng publish và healthcheck.
+- Cổng publish, pgAdmin, dashboard Grafana và ba câu LogQL.
 
 Ngoài phạm vi:
 
@@ -42,9 +42,9 @@ Trước mỗi đợt, ghi phiên bản tài liệu, ngày chạy và hệ đi�
 | Mã | Vai trò | Cách tạo |
 | --- | --- | --- |
 | AD-01 | Quản trị viên | Tài khoản hạt giống |
-| US-01 | Người dùng, sau đó là owner dự án | Đăng ký trên giao diện |
-| US-02 | Thành viên được mời | Đăng ký trên giao diện |
-| US-03 | Người không thuộc dự án | Đăng ký, không được mời |
+| US-01 | Người dùng, sau đó là owner dự án | AD-01 cấp tài khoản |
+| US-02 | Thành viên được mời | AD-01 cấp tài khoản |
+| US-03 | Người không thuộc dự án | AD-01 cấp tài khoản, không được mời |
 
 Mật khẩu kiểm thử đạt quy tắc: ít nhất 8 ký tự, có chữ và số. Không dùng mật khẩu này ngoài máy local.
 
@@ -55,7 +55,7 @@ Mật khẩu kiểm thử đạt quy tắc: ít nhất 8 ký tự, có chữ và
 | Đơn vị | Kiểm tra service nghiệp vụ: chuyển trạng thái, chặn owner tự khóa, tính tiến độ | Khi đã có mã API |
 | Tích hợp | Gọi API kèm PostgreSQL trong Compose | Sau khi API nối được CSDL |
 | Chấp nhận | Thao tác trên trình duyệt theo bảng ca bên dưới | Trước khi bàn giao |
-| Triển khai | Các tiêu chí DEP-01 đến DEP-07 | Cùng đợt chấp nhận |
+| Triển khai | Các tiêu chí DEP-01 đến DEP-13 | Cùng đợt chấp nhận |
 
 Một ca đạt khi kết quả quan sát khớp cột "Kết quả mong đợi" và cơ sở dữ liệu không phát sinh bản ghi ngoài mô tả.
 
@@ -63,12 +63,13 @@ Một ca đạt khi kết quả quan sát khớp cột "Kết quả mong đợi"
 
 | Mã | Việc cần làm | Kết quả mong đợi | Liên kết |
 | --- | --- | --- | --- |
-| TC-01 | Đăng ký US-01 với email chưa dùng | Vào được trang đăng nhập, không báo lỗi | FR-AUTH-01 |
-| TC-02 | Đăng ký lại đúng email US-01 | Báo email đã được sử dụng | FR-AUTH-01 |
-| TC-03 | Đăng ký mật khẩu `1234567` | Báo chưa đạt quy tắc mật khẩu | FR-AUTH-01 |
-| TC-04 | US-01 đăng nhập đúng | Vào bảng điều khiển | FR-AUTH-02 |
+| TC-01 | AD-01 cấp tài khoản US-01 với email chưa dùng | Tài khoản xuất hiện trong danh sách, vai trò người dùng | FR-USER-04 |
+| TC-02 | AD-01 cấp lại đúng email US-01 | Báo email đã được sử dụng | FR-USER-04 |
+| TC-03 | AD-01 cấp tài khoản với mật khẩu tạm `1234567` | Báo chưa đạt quy tắc mật khẩu, chưa tạo tài khoản | FR-USER-04 |
+| TC-03b | US-03 mở trang đăng nhập và tìm form đăng ký; gọi `POST /api/auth/register` | Không có form đăng ký; API trả 404 | FR-AUTH-01 |
+| TC-04 | US-01 đăng nhập bằng mật khẩu tạm | Vào màn hình buộc đổi mật khẩu, chưa vào được bảng điều khiển | FR-AUTH-02, FR-AUTH-06 |
 | TC-05 | US-01 đăng nhập sai mật khẩu | Báo một câu chung, không nói email có tồn tại hay không | FR-AUTH-02 |
-| TC-06 | Đổi mật khẩu US-01 rồi đăng nhập bằng mật khẩu mới | Đăng nhập thành công | FR-AUTH-04 |
+| TC-06 | Đổi mật khẩu US-01 rồi đăng nhập bằng mật khẩu mới | Vào bảng điều khiển, không còn màn hình buộc đổi mật khẩu | FR-AUTH-04, FR-AUTH-06 |
 | TC-07 | Xóa token (đăng xuất) rồi mở thẳng đường dẫn dự án | Quay về đăng nhập | FR-AUTH-03, FR-AUTH-05 |
 | TC-08 | AD-01 tìm US-01 trong danh sách người dùng | Thấy đúng email | FR-USER-01 |
 | TC-09 | AD-01 khóa US-01 | US-01 không đăng nhập được | FR-USER-02 |
@@ -112,7 +113,7 @@ Mỗi ca ghi: mã, người chạy, ngày, đạt hoặc không đạt, ảnh h�
 Đợt kiểm thử đạt khi:
 
 - TC-01 đến TC-34 không còn ca bắt buộc nào thất bại.
-- DEP-01 đến DEP-07 trong tài liệu Docker đều đạt.
+- DEP-01 đến DEP-13 trong tài liệu Docker đều đạt.
 - Lỗi còn lại được ghi là ngoài phạm vi hoặc đã có cách xử lý chấp nhận được với giảng viên.
 
 ## 9. Rủi ro kiểm thử

@@ -94,6 +94,7 @@ erDiagram
 | password_hash | varchar(255) | NOT NULL | Chuỗi bcrypt |
 | system_role | varchar(20) | NOT NULL, CHECK | `ADMIN` hoặc `USER` |
 | status | varchar(20) | NOT NULL, CHECK | `ACTIVE` hoặc `LOCKED` |
+| must_change_password | boolean | NOT NULL, mặc định false | Bật khi tài khoản vừa được cấp bằng mật khẩu tạm |
 | created_at | timestamptz | NOT NULL, mặc định `now()` | Thời điểm tạo |
 | updated_at | timestamptz | NOT NULL | Thời điểm sửa gần nhất |
 
@@ -217,7 +218,7 @@ Các mức này tương ứng yêu cầu hiệu năng NFR-01.
 
 Khi API khởi động:
 
-- Nếu chưa có dòng `users.system_role = 'ADMIN'`, tạo một tài khoản từ `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`.
+- Nếu chưa có dòng `users.system_role = 'ADMIN'`, tạo một tài khoản từ `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_NAME`. Tài khoản này có `must_change_password = false`.
 - Không chèn dự án mẫu trong lược đồ gốc. Dữ liệu nghiệp vụ do người dùng tạo khi kiểm thử.
 
 ## 7. Ánh xạ sang API

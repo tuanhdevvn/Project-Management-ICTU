@@ -10,12 +10,11 @@
 
 ```mermaid
 flowchart TB
-    Guest((Khách))
+    Guest((Người chưa đăng nhập))
     Member((Thành viên))
     Manager((Quản lý dự án))
     Admin((Quản trị viên))
 
-    Guest --> UC01[Đăng ký]
     Guest --> UC02[Đăng nhập]
 
     Member --> UC03[Đăng xuất]
@@ -32,6 +31,7 @@ flowchart TB
     Manager --> UC09[Tạo và điều phối công việc]
     Manager --> UC11[Xem nhật ký dự án]
 
+    Admin --> UC01[Cấp tài khoản]
     Admin --> UC14[Quản lý tài khoản]
     Admin --> UC15[Xem mọi dự án]
 ```
@@ -42,8 +42,8 @@ Quản lý dự án kế thừa các ca của thành viên trong những dự á
 
 | Mã | Tên | Tác nhân chính | Yêu cầu SRS |
 | --- | --- | --- | --- |
-| UC-01 | Đăng ký | Khách | FR-AUTH-01 |
-| UC-02 | Đăng nhập | Khách | FR-AUTH-02, FR-AUTH-05 |
+| UC-01 | Cấp tài khoản | Quản trị viên | FR-USER-04 |
+| UC-02 | Đăng nhập | Người được cấp tài khoản | FR-AUTH-02, FR-AUTH-05, FR-AUTH-06 |
 | UC-03 | Đăng xuất | Người đã đăng nhập | FR-AUTH-03 |
 | UC-04 | Đổi mật khẩu | Người đã đăng nhập | FR-AUTH-04 |
 | UC-05 | Xem bảng điều khiển | Thành viên | FR-DASH-01, FR-DASH-02 |
@@ -55,30 +55,30 @@ Quản lý dự án kế thừa các ca của thành viên trong những dự á
 | UC-11 | Xem nhật ký dự án | Quản lý dự án | FR-CMT-02 |
 | UC-12 | Bình luận công việc | Thành viên | FR-CMT-01 |
 | UC-13 | Xem và đọc thông báo | Thành viên | FR-NOTI-01, FR-NOTI-02 |
-| UC-14 | Quản lý tài khoản hệ thống | Quản trị viên | FR-USER-01, FR-USER-02, FR-USER-03 |
+| UC-14 | Quản lý tài khoản hệ thống | Quản trị viên | FR-USER-01, FR-USER-02, FR-USER-03, FR-USER-04 |
 | UC-15 | Giám sát toàn bộ dự án | Quản trị viên | FR-PRJ-02 |
 
 ## 3. Đặc tả chi tiết
 
-### UC-01. Đăng ký
+### UC-01. Cấp tài khoản
 
 | Mục | Nội dung |
 | --- | --- |
-| Tác nhân | Khách |
-| Tiền điều kiện | Khách đang ở trang đăng ký |
-| Hậu điều kiện | Có tài khoản `USER` đang hoạt động |
-| Luồng chính | 1. Khách nhập họ tên, email, mật khẩu, xác nhận mật khẩu. 2. Hệ thống kiểm tra định dạng và độ mạnh mật khẩu. 3. Hệ thống kiểm tra email chưa tồn tại. 4. Hệ thống lưu tài khoản và chuyển tới trang đăng nhập. |
-| Ngoại lệ | Email đã tồn tại: báo "Email đã được sử dụng". Mật khẩu không khớp hoặc chưa đủ quy tắc: giữ form, chỉ rõ trường sai. |
+| Tác nhân | Quản trị viên |
+| Tiền điều kiện | Đã đăng nhập với vai trò `ADMIN` |
+| Hậu điều kiện | Có tài khoản `USER` đang hoạt động, mật khẩu là mật khẩu tạm, cờ buộc đổi mật khẩu đang bật |
+| Luồng chính | 1. Quản trị viên mở danh sách người dùng và chọn Cấp tài khoản. 2. Nhập họ tên, email và mật khẩu tạm. 3. Hệ thống kiểm tra email chưa tồn tại và mật khẩu đạt quy tắc. 4. Lưu tài khoản. 5. Quản trị viên giao email và mật khẩu tạm cho nhân viên bằng kênh ngoài hệ thống. |
+| Ngoại lệ | Email đã tồn tại: báo "Email đã được sử dụng". Mật khẩu tạm chưa đủ quy tắc: giữ form, chỉ rõ trường sai. Người không phải quản trị viên gọi chức năng này: từ chối 403. |
 
 ### UC-02. Đăng nhập
 
 | Mục | Nội dung |
 | --- | --- |
-| Tác nhân | Khách |
+| Tác nhân | Người được cấp tài khoản |
 | Tiền điều kiện | Tài khoản đã tồn tại |
-| Hậu điều kiện | Trình duyệt giữ JWT; người dùng vào bảng điều khiển |
-| Luồng chính | 1. Nhập email và mật khẩu. 2. Hệ thống đối chiếu tài khoản đang hoạt động. 3. Cấp JWT hạn 8 giờ. 4. Mở bảng điều khiển. |
-| Ngoại lệ | Sai email hoặc mật khẩu: một thông báo chung "Email hoặc mật khẩu không đúng". Tài khoản bị khóa: "Tài khoản đang bị khóa". |
+| Hậu điều kiện | Trình duyệt giữ JWT; người dùng vào bảng điều khiển, hoặc vào màn hình đổi mật khẩu nếu còn mật khẩu tạm |
+| Luồng chính | 1. Nhập email và mật khẩu. 2. Hệ thống đối chiếu tài khoản đang hoạt động. 3. Cấp JWT hạn 8 giờ. 4. Nếu cờ buộc đổi mật khẩu đang bật, chỉ mở màn hình đổi mật khẩu. 5. Sau khi đổi xong, mở bảng điều khiển. |
+| Ngoại lệ | Sai email hoặc mật khẩu: một thông báo chung "Email hoặc mật khẩu không đúng". Tài khoản bị khóa: "Tài khoản đang bị khóa". Chưa được cấp tài khoản: không có đường tự đăng ký. |
 
 ### UC-05. Xem bảng điều khiển
 
@@ -163,15 +163,15 @@ Thứ tự trạng thái: `TODO`, `IN_PROGRESS`, `REVIEW`, `DONE`.
 | Tác nhân | Quản trị viên |
 | Tiền điều kiện | Vai trò hệ thống `ADMIN` |
 | Hậu điều kiện | Trạng thái hoặc vai trò tài khoản thay đổi |
-| Luồng chính | 1. Mở danh sách người dùng. 2. Tìm theo tên hoặc email. 3. Khóa, mở khóa, hoặc đổi vai trò. 4. Hệ thống lưu và ghi nhận người thực hiện. |
+| Luồng chính | 1. Mở danh sách người dùng. 2. Tìm theo tên hoặc email. 3. Cấp tài khoản, khóa, mở khóa, hoặc đổi vai trò. 4. Hệ thống lưu và ghi nhận người thực hiện. |
 | Ngoại lệ | Quản trị viên tự khóa chính mình: từ chối. Khóa quản trị viên cuối cùng: từ chối. |
 
 ## 4. Ma trận truy vết ca sử dụng — yêu cầu
 
 | Ca sử dụng | FR-AUTH | FR-USER | FR-PRJ | FR-MEM | FR-TASK | FR-CMT | FR-DASH | FR-NOTI |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| UC-01, UC-02, UC-03, UC-04 | Có |  |  |  |  |  |  |  |
-| UC-14 |  | Có |  |  |  |  |  |  |
+| UC-01, UC-14 |  | Có |  |  |  |  |  |  |
+| UC-02, UC-03, UC-04 | Có |  |  |  |  |  |  |  |
 | UC-06, UC-07, UC-15 |  |  | Có |  |  |  |  |  |
 | UC-08 |  |  |  | Có |  |  |  | Có |
 | UC-09, UC-10 |  |  |  |  | Có |  |  | Có |

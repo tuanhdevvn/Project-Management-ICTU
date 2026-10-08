@@ -3,8 +3,10 @@
 | Mục | Nội dung |
 | --- | --- |
 | Tên hệ thống | Hệ thống Quản lý Dự án |
+| Môn | Triển khai và Quản trị Hệ thống Phần mềm |
+| Đề | Đề 14 |
 | Mã | PMS-ICTU |
-| Phiên bản | 1.0 |
+| Phiên bản | 1.1 |
 | Ngày | 08/10/2026 |
 | Sinh viên | [Họ và tên] — MSSV: [........] — Lớp: [........] |
 | Giảng viên | [Họ và tên giảng viên] |
@@ -13,21 +15,21 @@
 
 ### 1.1. Mục đích
 
-Tài liệu mô tả yêu cầu của Hệ thống Quản lý Dự án dùng cho đồ án môn học. Người đọc gồm giảng viên nghiệm thu, thành viên nhóm phát triển và người kiểm thử.
+Tài liệu mô tả yêu cầu nghiệp vụ của Hệ thống Quản lý Dự án, đề 14 môn Triển khai và Quản trị Hệ thống Phần mềm. Phần triển khai, giám sát và chấm điểm nằm ở [yêu cầu đề tài](00-yeu-cau-de-tai.md).
 
-Hệ thống là ứng dụng web giúp tạo dự án, phân công thành viên, theo dõi công việc và xem tiến độ. Toàn bộ ứng dụng chạy trên máy cá nhân thông qua Docker Desktop.
+Hệ thống là ứng dụng web nội bộ giúp tạo dự án, phân công thành viên, theo dõi công việc và xem tiến độ. Toàn bộ ứng dụng chạy trên máy cá nhân thông qua Docker Desktop. Nhân viên không tự đăng ký; quản trị viên cấp từng tài khoản.
 
 ### 1.2. Phạm vi
 
 Trong phạm vi phiên bản 1.0:
 
-- Đăng ký, đăng nhập, phân quyền.
+- Đăng nhập và phân quyền. Tài khoản do quản trị viên cấp, không có đăng ký công khai.
 - Quản lý người dùng ở mức quản trị.
 - Quản lý dự án và thành viên dự án.
 - Quản lý công việc theo trạng thái.
 - Bình luận trên công việc và nhật ký hoạt động.
 - Bảng điều khiển tiến độ và thông báo trong hệ thống.
-- Đóng gói và chạy bằng Docker Compose.
+- Đóng gói bằng Docker Compose: Nginx reverse proxy, PostgreSQL, pgAdmin, Prometheus, Grafana, Loki và Promtail.
 
 Ngoài phạm vi phiên bản 1.0:
 
@@ -36,6 +38,8 @@ Ngoài phạm vi phiên bản 1.0:
 - Tích hợp email, Slack, Google Calendar.
 - Triển khai lên máy chủ đám mây hoặc Kubernetes.
 - Chat thời gian thực và gọi video.
+- Đăng ký công khai.
+- Đăng nhập một lần qua thư mục nhân sự của công ty (SSO, LDAP, Active Directory). Phiên bản 1.0 thay bằng tài khoản cục bộ do quản trị viên cấp.
 
 ### 1.3. Định nghĩa và từ viết tắt
 
@@ -59,13 +63,13 @@ Ngoài phạm vi phiên bản 1.0:
 
 ### 2.1. Bối cảnh
 
-Nhóm làm việc cần một nơi chung để biết dự án nào đang mở, ai phụ trách việc gì và việc nào sắp đến hạn. Phiên bản đồ án chạy cục bộ: người dùng mở trình duyệt tới cổng do Docker Desktop xuất ra, không cần cài riêng Node.js hay PostgreSQL trên máy.
+Nhóm làm việc trong một đơn vị cần một nơi chung để biết dự án nào đang mở, ai phụ trách việc gì và việc nào sắp đến hạn. Danh tính nhân viên do đơn vị quản lý: quản trị viên tạo tài khoản và giao mật khẩu tạm, nhân viên đăng nhập rồi đổi mật khẩu. Phiên bản đồ án chạy cục bộ: người dùng mở trình duyệt tới cổng do Docker Desktop xuất ra, không cần cài riêng Node.js hay PostgreSQL trên máy.
 
 ### 2.2. Tác nhân
 
 | Tác nhân | Mô tả |
 | --- | --- |
-| Khách | Người chưa đăng nhập. Chỉ đăng ký và đăng nhập. |
+| Người chưa đăng nhập | Chỉ đăng nhập bằng tài khoản đã được cấp. Không tạo tài khoản mới. |
 | Thành viên | Người dùng đã đăng nhập, tham gia dự án được mời. |
 | Quản lý dự án | Người tạo hoặc được gán quyền quản lý một dự án. |
 | Quản trị viên | Người vận hành toàn hệ thống: người dùng, vai trò, mọi dự án. |
@@ -76,7 +80,7 @@ Một tài khoản có đúng một vai trò hệ thống: `ADMIN` hoặc `USER`
 
 ```mermaid
 flowchart LR
-    Guest[Khách] --> Auth[Xác thực]
+    Guest[Người chưa đăng nhập] --> Auth[Đăng nhập]
     Auth --> User[Người dùng]
     User --> Dash[Bảng điều khiển]
     User --> Project[Dự án]
@@ -101,6 +105,7 @@ Mọi tài khoản đang hoạt động đều tạo được dự án mới và
 | Cập nhật công việc được gán cho mình | Có | Có | Có |
 | Bình luận công việc mình thấy | Có | Có | Có |
 | Khóa tài khoản, gán vai trò hệ thống | Không | Không | Có |
+| Cấp tài khoản mới | Không | Không | Có |
 
 Người tạo dự án nhận vai trò `OWNER`. `OWNER` và `MANAGER` cùng được gọi là quản lý dự án trong các yêu cầu bên dưới. Chỉ `OWNER` hoặc quản trị viên được xóa dự án và chuyển quyền sở hữu.
 
@@ -110,8 +115,8 @@ Người tạo dự án nhận vai trò `OWNER`. `OWNER` và `MANAGER` cùng đ�
 | --- | --- |
 | Máy chủ chạy ứng dụng | Docker Desktop trên Windows, macOS hoặc Linux |
 | Trình duyệt | Chrome, Edge hoặc Firefox bản hiện hành |
-| Cơ sở dữ liệu | PostgreSQL 16 trong container |
-| Cổng mặc định | `http://localhost:8080` |
+| Cơ sở dữ liệu | PostgreSQL 16 và pgAdmin 4 trong container |
+| Cổng website | `http://localhost:8080` qua Nginx |
 
 ### 2.6. Ràng buộc thiết kế
 
@@ -129,11 +134,12 @@ Mỗi yêu cầu có mã, mô tả và tiêu chí chấp nhận.
 
 | Mã | Yêu cầu | Tiêu chí chấp nhận |
 | --- | --- | --- |
-| FR-AUTH-01 | Đăng ký tài khoản bằng họ tên, email, mật khẩu | Email chưa tồn tại thì tạo tài khoản vai trò `USER` và trạng thái đang hoạt động |
-| FR-AUTH-02 | Đăng nhập bằng email và mật khẩu | Đúng thông tin thì trả JWT và thông tin người dùng; sai thì báo lỗi, không lộ mật khẩu |
+| FR-AUTH-01 | Không có đăng ký công khai | Giao diện không có form đăng ký. Không có API để khách tự tạo tài khoản |
+| FR-AUTH-02 | Đăng nhập bằng email và mật khẩu đã được cấp | Đúng thông tin thì trả JWT và thông tin người dùng; sai thì báo lỗi, không lộ mật khẩu |
 | FR-AUTH-03 | Đăng xuất | Phía giao diện xóa token; các lời gọi sau đó bị từ chối nếu không còn token hợp lệ |
-| FR-AUTH-04 | Đổi mật khẩu khi đã đăng nhập | Mật khẩu hiện tại đúng và mật khẩu mới đạt quy tắc thì cập nhật thành công |
+| FR-AUTH-04 | Đổi mật khẩu khi đã đăng nhập | Mật khẩu hiện tại đúng và mật khẩu mới đạt quy tắc thì cập nhật thành công, đồng thời tắt cờ buộc đổi mật khẩu |
 | FR-AUTH-05 | Chặn truy cập khi chưa đăng nhập hoặc tài khoản bị khóa | API nghiệp vụ trả 401 hoặc 403 tương ứng |
+| FR-AUTH-06 | Buộc đổi mật khẩu tạm ở lần đăng nhập đầu | Khi cờ buộc đổi mật khẩu đang bật, người dùng chỉ gọi được API hồ sơ và đổi mật khẩu; các API nghiệp vụ khác trả 403 |
 
 Quy tắc mật khẩu: ít nhất 8 ký tự, có chữ và số.
 
@@ -144,6 +150,7 @@ Quy tắc mật khẩu: ít nhất 8 ký tự, có chữ và số.
 | FR-USER-01 | Quản trị viên xem danh sách người dùng, tìm theo tên hoặc email | Danh sách có phân trang, mỗi trang tối đa 20 bản ghi |
 | FR-USER-02 | Khóa và mở khóa tài khoản | Tài khoản khóa không đăng nhập được; quản trị viên không tự khóa chính mình |
 | FR-USER-03 | Gán vai trò hệ thống `ADMIN` hoặc `USER` | Vai trò mới có hiệu lực ở lần gọi API tiếp theo |
+| FR-USER-04 | Cấp tài khoản nhân viên: họ tên, email, mật khẩu tạm | Chỉ quản trị viên. Email chưa tồn tại thì tạo vai trò `USER`, trạng thái đang hoạt động, và bật cờ buộc đổi mật khẩu |
 
 ### 3.3. Quản lý dự án
 
@@ -199,7 +206,7 @@ Quy tắc mật khẩu: ít nhất 8 ký tự, có chữ và số.
 | NFR-01 | Hiệu năng | Với dữ liệu đồ án (tối đa 50 người dùng, 100 dự án, 2.000 công việc), API danh sách trả kết quả trong dưới 1 giây trên máy phát triển |
 | NFR-02 | Bảo mật | Mật khẩu băm bằng bcrypt; API nghiệp vụ yêu cầu JWT; kiểm tra quyền trên máy chủ, không chỉ ẩn nút trên giao diện |
 | NFR-03 | Toàn vẹn | Xóa và cập nhật tuân ràng buộc khóa ngoại; không để công việc trỏ tới dự án đã mất |
-| NFR-04 | Sẵn sàng triển khai | Lệnh `docker compose up -d --build` trên Docker Desktop dựng đủ Nginx, giao diện, API và PostgreSQL |
+| NFR-04 | Sẵn sàng triển khai | Lệnh `docker compose up -d --build` dựng website, PostgreSQL, pgAdmin, Nginx, Prometheus, Grafana, Loki và Promtail |
 | NFR-05 | Bền vững dữ liệu | Tắt và bật lại cụm container không làm mất dữ liệu đã ghi |
 | NFR-06 | Khả năng sử dụng | Luồng chính (đăng nhập, mở dự án, tạo việc, đổi trạng thái) thực hiện được không cần tài liệu ngoài màn hình |
 | NFR-07 | Nhật ký vận hành | API ghi log mức info cho yêu cầu và mức error cho lỗi không xử lý được |
@@ -228,3 +235,4 @@ Quy tắc mật khẩu: ít nhất 8 ký tự, có chữ và số.
 - Phiên bản 1.0 dùng một cơ sở dữ liệu duy nhất, không tách đọc/ghi.
 - Không có máy chủ SMTP; thông báo chỉ hiện trong ứng dụng.
 - Tài khoản quản trị đầu tiên được tạo bằng biến môi trường khi API khởi động lần đầu, nếu chưa có tài khoản `ADMIN` nào.
+- Mật khẩu tạm được quản trị viên giao trực tiếp cho nhân viên trong phiên bản 1.0, vì hệ thống không gửi email.

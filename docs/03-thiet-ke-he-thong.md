@@ -37,7 +37,8 @@ flowchart TB
 
 ### 2.1. Tầng giao diện
 
-- Trang đăng nhập, đăng ký.
+- Trang đăng nhập. Không có trang đăng ký.
+- Trang buộc đổi mật khẩu khi tài khoản vừa được cấp.
 - Khung ứng dụng sau đăng nhập: thanh điều hướng, vùng nội dung, biểu tượng thông báo.
 - Trang bảng điều khiển, danh sách dự án, chi tiết dự án, bảng công việc, quản trị người dùng.
 - Lưu JWT trong `sessionStorage`. Hết hạn hoặc nhận 401 thì xóa token và về trang đăng nhập.
@@ -61,7 +62,7 @@ PostgreSQL lưu dữ liệu nghiệp vụ. Khởi tạo lược đồ bằng scr
 
 ## 3. Kiến trúc triển khai
 
-Chi tiết cổng, mạng và volume nằm ở [tài liệu Docker](06-trien-khai-docker.md). Nhìn từ phía người dùng:
+Chi tiết cổng, mạng, pgAdmin, Prometheus, Grafana và Loki nằm ở [tài liệu Docker](06-trien-khai-docker.md). Luồng nghiệp vụ nhìn từ phía người dùng:
 
 ```mermaid
 flowchart LR
@@ -160,6 +161,7 @@ Với mỗi lời gọi có `{projectId}`:
 | --- | --- | --- |
 | Thiếu hoặc hết hạn token | 401 | `UNAUTHENTICATED` |
 | Đủ đăng nhập nhưng sai vai trò | 403 | `FORBIDDEN` |
+| Còn mật khẩu tạm nhưng gọi API nghiệp vụ | 403 | `PASSWORD_CHANGE_REQUIRED` |
 | Không tìm thấy tài nguyên hoặc không được biết sự tồn tại | 404 | `NOT_FOUND` |
 | Dữ liệu vào không hợp lệ | 422 | `VALIDATION_ERROR` |
 | Xung đột dữ liệu, ví dụ email trùng | 409 | `CONFLICT` |

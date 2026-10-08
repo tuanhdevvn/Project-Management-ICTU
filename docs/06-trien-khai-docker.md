@@ -3,171 +3,146 @@
 | Mục | Nội dung |
 | --- | --- |
 | Hệ thống | PMS-ICTU |
-| Phiên bản | 1.0 |
+| Đề | Đề 14, môn Triển khai và Quản trị Hệ thống Phần mềm |
+| Phiên bản | 1.1 |
 | Công cụ | Docker Desktop, Docker Compose v2 |
-| Liên kết | [Thiết kế hệ thống](03-thiet-ke-he-thong.md) |
+| Liên kết | [Yêu cầu đề tài](00-yeu-cau-de-tai.md), [Thiết kế hệ thống](03-thiet-ke-he-thong.md) |
 
 ## 1. Mục tiêu triển khai
 
-Người nghiệm thu chỉ cần Docker Desktop. Không cài Node.js, PostgreSQL hay Nginx lên máy host. Một lệnh dựng bốn dịch vụ, trình duyệt mở `http://localhost:8080`.
+Toàn bộ hệ thống chạy bằng một file Docker Compose trên Docker Desktop. Máy host không cần cài Node.js, PostgreSQL, Nginx, Prometheus hay Grafana.
+
+Người demo mở website qua Nginx, xem dữ liệu bằng pgAdmin, xem metric bằng Grafana và chạy LogQL trên Loki.
 
 ## 2. Yêu cầu máy
 
 | Hạng mục | Mức tối thiểu |
 | --- | --- |
-| Docker Desktop | Bản còn được hỗ trợ, bật engine Linux containers |
-| CPU / RAM cấp cho Docker | 2 CPU, 4 GB RAM |
-| Đĩa trống | 5 GB cho image và volume |
-| Cổng host còn trống | 8080 |
-
-Kiểm tra nhanh:
+| Docker Desktop | Bản còn được hỗ trợ, engine Linux containers đang chạy |
+| CPU / RAM cấp cho Docker | 2 CPU, 8 GB RAM |
+| Đĩa trống | 10 GB cho image và volume |
+| Cổng host còn trống | 8080, 8443, 5050, 3001 |
 
 ```bash
 docker version
 docker compose version
 ```
 
-Cả hai lệnh cần in phiên bản client và server. Nếu server không chạy, mở Docker Desktop và đợi trạng thái Engine running.
-
 ## 3. Thành phần
 
-| Dịch vụ | Image / cách dựng | Vai trò | Cổng |
+| Dịch vụ | Image / cách dựng | Vai trò | Cổng trên host |
 | --- | --- | --- | --- |
-| `gateway` | Nginx 1.27 | Nhận lưu lượng từ host, phát tệp giao diện và chuyển `/api` | Host `8080` → container `80` |
-| `web` | Build từ `apps/web` | Ứng dụng React đã build, chỉ trong mạng nội bộ | Không publish |
-| `api` | Build từ `apps/api`, Node.js 20 | REST API | Không publish, lắng nghe `3000` trong mạng |
-| `postgres` | `postgres:16` | Cơ sở dữ liệu | Không publish, lắng nghe `5432` trong mạng |
-
-`web` có thể được gộp vào image `gateway` ở bước hiện thực (Nginx phục vụ tệp tĩnh và ủy quyền API). Đặc tả chấp nhận cả hai cách, miễn là từ phía host chỉ có cổng 8080 và đường dẫn `/` cùng `/api` giữ nguyên.
+| `gateway` | `nginxinc/nginx-unprivileged` | Reverse proxy, security headers, HTTPS tự ký | `8080`, `8443` |
+| `web` | Build từ `apps/web` | Giao diện React | Không publish |
+| `api` | Build từ `apps/api`, chạy user `node` | REST API, expose `/metrics` | Không publish |
+| `postgres` | `postgres:16` | Cơ sở dữ liệu | Không publish |
+| `pgadmin` | `dpage/pgadmin4` | Công cụ quản lý PostgreSQL | `127.0.0.1:5050` |
+| `prometheus` | `prom/prometheus` | Thu metrics | Không publish |
+| `cadvisor` | `gcr.io/cadvisor/cadvisor` | Metrics container | Không publish |
+| `postgres-exporter` | `prometheuscommunity/postgres-exporter` | Metrics database | Không publish |
+| `nginx-exporter` | `nginx/nginx-prometheus-exporter` | Metrics Nginx | Không publish |
+| `grafana` | `grafana/grafana` | Dashboard và cửa sổ LogQL | `127.0.0.1:3001` |
+| `loki` | `grafana/loki` | Kho log | Không publish |
+| `promtail` | `grafana/promtail` | Đẩy log container vào Loki | Không publish |
 
 ```mermaid
 flowchart TB
     subgraph host [Máy host]
-      Browser[Trình duyệt localhost:8080]
+      Browser[Trình duyệt]
     end
-    subgraph compose [Docker Compose - mạng pms_net]
+    subgraph edge [mạng edge]
       Gateway[gateway]
+    end
+    subgraph appnet [mạng app]
       Web[web]
       Api[api]
+    end
+    subgraph data [mạng data]
       Db[postgres]
-      Vol[(volume pms_pg_data)]
+      Pgadmin[pgadmin]
+    end
+    subgraph obs [mạng obs]
+      Prom[prometheus]
+      Graf[grafana]
+      Loki[loki]
+      Tail[promtail]
     end
     Browser --> Gateway
     Gateway --> Web
     Gateway --> Api
     Api --> Db
-    Db --> Vol
+    Pgadmin --> Db
+    Prom --> Gateway
+    Prom --> Api
+    Prom --> Db
+    Tail --> Loki
+    Graf --> Prom
+    Graf --> Loki
 ```
 
-## 4. Mạng, volume, khởi động
+`gateway` thuộc cả mạng `edge`, `app` và `obs` để nhận request từ host, chuyển vào ứng dụng và để exporter đọc `stub_status`. `api` thuộc `app` và `data`. `promtail` đọc log Docker trên host qua socket chỉ đọc, rồi đẩy sang Loki trên mạng `obs`.
 
-| Đối tượng | Tên | Quy tắc |
+## 4. Mạng và volume
+
+| Mạng | Dịch vụ được vào | Mục đích |
 | --- | --- | --- |
-| Mạng | `pms_net` | Bridge, các dịch vụ gọi nhau bằng tên |
-| Volume | `pms_pg_data` | Gắn vào `/var/lib/postgresql/data` |
-| Khởi tạo lược đồ | `database/init` | Mount vào `/docker-entrypoint-initdb.d` ở chế độ chỉ đọc |
+| `edge` | gateway | Ngăn các dịch vụ nội bộ nhận traffic trực tiếp từ host |
+| `app` | gateway, web, api | Luồng website và API |
+| `data` | api, postgres, pgadmin, postgres-exporter | Database không nằm trên mạng của Grafana |
+| `obs` | prometheus, grafana, loki, promtail, cadvisor, nginx-exporter, gateway, api | Giám sát và log |
 
-Script trong `docker-entrypoint-initdb.d` chỉ chạy khi volume còn trống. Sửa file SQL sau đó không tự áp lên dữ liệu cũ. Khi cần dựng lại từ đầu, xóa volume bằng lệnh có chủ đích ở mục 8.
+| Volume | Gắn vào |
+| --- | --- |
+| `pms_pg_data` | Dữ liệu PostgreSQL |
+| `pms_pgadmin_data` | Phiên pgAdmin |
+| `pms_prometheus_data` | Dữ liệu metrics |
+| `pms_grafana_data` | Dashboard Grafana |
+| `pms_loki_data` | Chunk log |
 
-Thứ tự phụ thuộc:
+Script `database/init` mount chỉ đọc vào `/docker-entrypoint-initdb.d`. Script chỉ chạy khi volume PostgreSQL còn trống. Script tạo database `pms`, user `pms_app` và chỉ cấp `CONNECT`, `USAGE`, `SELECT`, `INSERT`, `UPDATE`, `DELETE` trên schema ứng dụng. User superuser của image chỉ dùng để khởi tạo và để pgAdmin demo.
 
-1. `postgres` đạt healthcheck `pg_isready`.
-2. `api` khởi động sau đó và chờ cơ sở dữ liệu.
-3. `gateway` khởi động sau `api` và `web`.
+## 5. Nginx
 
-Healthcheck của `api`: `GET /api/health` trả `200` và thân `{ "data": { "status": "ok" } }`. Endpoint này không yêu cầu JWT.
+`deploy/nginx.conf` làm các việc sau:
 
-## 5. Biến môi trường
+- `/` chuyển tới dịch vụ `web`.
+- `/api/` chuyển tới `http://api:3000`.
+- `/nginx_status` chỉ cho phép IP nội bộ của nginx-exporter, không public ra ngoài location thường.
+- Cổng 8080 phục vụ HTTP. Cổng 8443 phục vụ HTTPS bằng chứng chỉ tự ký trong `deploy/certs`.
+- Thêm header: `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Content-Security-Policy` mức cơ bản, `Strict-Transport-Security` trên cổng 8443.
 
-Tệp mẫu `.env.example` nằm ở gốc kho. Tệp `.env` thật không đưa vào git.
+Chứng chỉ tự ký được tạo khi dựng, lưu trong thư mục bị gitignore. README ghi lệnh tạo lại chứng chỉ. Trình duyệt sẽ cảnh báo chứng chỉ không tin cậy; đó là kết quả đúng của HTTPS tự ký.
 
-| Biến | Ví dụ | Dùng ở | Ý nghĩa |
-| --- | --- | --- | --- |
-| `POSTGRES_DB` | `pms` | postgres, api | Tên cơ sở dữ liệu |
-| `POSTGRES_USER` | `pms` | postgres, api | Người dùng CSDL |
-| `POSTGRES_PASSWORD` | đặt riêng | postgres, api | Mật khẩu CSDL |
-| `DATABASE_URL` | `postgres://pms:matkhau@postgres:5432/pms` | api | Chuỗi kết nối, host là tên dịch vụ |
-| `JWT_SECRET` | chuỗi ngẫu nhiên dài | api | Khóa ký token |
-| `JWT_EXPIRES_IN` | `8h` | api | Hạn token |
-| `SEED_ADMIN_NAME` | `Quản trị hệ thống` | api | Tên admin hạt giống |
-| `SEED_ADMIN_EMAIL` | `admin@pms.local` | api | Email admin |
-| `SEED_ADMIN_PASSWORD` | đặt riêng | api | Mật khẩu admin lần đầu |
-| `WEB_PORT` | `8080` | gateway | Cổng publish ra host |
+## 6. Giám sát và log
 
-`DATABASE_URL` dùng hostname `postgres`, không dùng `localhost`. Trong một container, `localhost` là chính container đó.
+Prometheus scrape:
 
-## 6. Tệp Compose tham chiếu
+- `cadvisor` cho CPU, bộ nhớ và trạng thái container.
+- `nginx-exporter` cho request của web server.
+- `postgres-exporter` cho kết nối và kích thước database.
+- `api` tại `/metrics` cho số request ứng dụng.
 
-Đường dẫn dự kiến: `deploy/docker-compose.yml`.
+Grafana được cấp sẵn ba dashboard: Container, Nginx, PostgreSQL. Datasource Prometheus và Loki được khai báo bằng file provisioning, không tạo tay lúc demo.
 
-```yaml
-services:
-  postgres:
-    image: postgres:16
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - pms_pg_data:/var/lib/postgresql/data
-      - ../database/init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-    networks: [pms_net]
-    restart: unless-stopped
+Promtail gắn nhãn `service` theo tên dịch vụ Compose. Ba câu LogQL bắt buộc nằm ở [yêu cầu đề tài](00-yeu-cau-de-tai.md).
 
-  api:
-    build:
-      context: ../apps/api
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
-      SEED_ADMIN_NAME: ${SEED_ADMIN_NAME}
-      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL}
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks: [pms_net]
-    restart: unless-stopped
+## 7. Biến môi trường
 
-  web:
-    build:
-      context: ../apps/web
-    networks: [pms_net]
-    restart: unless-stopped
+Tệp `.env.example` ở gốc kho. Tệp `.env` không đưa vào git.
 
-  gateway:
-    image: nginx:1.27
-    ports:
-      - "${WEB_PORT:-8080}:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on: [web, api]
-    networks: [pms_net]
-    restart: unless-stopped
+| Biến | Dùng ở | Ý nghĩa |
+| --- | --- | --- |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | postgres, pgAdmin | Tài khoản quản trị database cho pgAdmin |
+| `PMS_APP_DB_USER`, `PMS_APP_DB_PASSWORD` | script init, api | User hạn chế quyền mà API dùng |
+| `DATABASE_URL` | api | Trỏ host `postgres`, user `pms_app` |
+| `JWT_SECRET` | api | Khóa ký token, chuỗi dài ngẫu nhiên |
+| `PGADMIN_DEFAULT_EMAIL`, `PGADMIN_DEFAULT_PASSWORD` | pgadmin | Đăng nhập pgAdmin |
+| `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD` | grafana | Đăng nhập Grafana |
+| `WEB_PORT`, `WEB_TLS_PORT` | gateway | Mặc định 8080 và 8443 |
 
-networks:
-  pms_net:
+Mật khẩu mẫu trong `.env.example` chỉ là chỗ trống. Mật khẩu thật dài ít nhất 12 ký tự.
 
-volumes:
-  pms_pg_data:
-```
-
-`deploy/nginx.conf` cần:
-
-- `/api/` ủy quyền tới `http://api:3000`.
-- `/` phục vụ giao diện. Nếu `web` là container riêng, dùng `proxy_pass` tới dịch vụ đó; nếu tệp tĩnh nằm trong image gateway thì dùng `root`.
-
-Tiêu đề `Host` và `X-Forwarded-For` được chuyển tiếp. Kích thước thân yêu cầu cho phép tối thiểu 1 MB.
-
-## 7. Quy trình chạy
-
-Thực hiện tại thư mục gốc kho mã, sau khi đã có mã nguồn ứng dụng và tệp `.env`.
+## 8. Quy trình chạy
 
 ```bash
 cp .env.example .env
@@ -175,50 +150,46 @@ docker compose -f deploy/docker-compose.yml up -d --build
 docker compose -f deploy/docker-compose.yml ps
 ```
 
-Kỳ vọng cột trạng thái của cả bốn dịch vụ là running, `postgres` và `api` là healthy.
+Kỳ vọng mọi dịch vụ running. `postgres` và `api` healthy.
 
-Mở `http://localhost:8080`. Đăng nhập bằng tài khoản trong `SEED_ADMIN_EMAIL` và `SEED_ADMIN_PASSWORD`.
-
-Xem log khi cần:
-
-```bash
-docker compose -f deploy/docker-compose.yml logs -f api
-```
-
-Dừng cụm, giữ dữ liệu:
-
-```bash
-docker compose -f deploy/docker-compose.yml down
-```
-
-## 8. Dữ liệu và đặt lại
-
-| Việc | Lệnh | Kết quả |
-| --- | --- | --- |
-| Tắt cụm | `docker compose -f deploy/docker-compose.yml down` | Container mất, volume còn |
-| Bật lại | `docker compose -f deploy/docker-compose.yml up -d` | Dữ liệu cũ còn |
-| Xóa cả dữ liệu | `docker compose -f deploy/docker-compose.yml down -v` | Volume `pms_pg_data` bị xóa |
-
-Chỉ dùng `down -v` khi cố ý dựng lại cơ sở dữ liệu trống.
-
-## 9. Tiêu chí nghiệm thu triển khai
-
-| Mã | Tiêu chí |
+| Việc cần kiểm tra | Đường dẫn |
 | --- | --- |
-| DEP-01 | `docker compose up -d --build` thoát mã 0 trên Docker Desktop |
-| DEP-02 | Chỉ cổng 8080 được publish; `5432` không mở trên host |
-| DEP-03 | `http://localhost:8080` trả trang đăng nhập |
-| DEP-04 | `http://localhost:8080/api/health` trả trạng thái ok |
-| DEP-05 | Đăng nhập được bằng tài khoản hạt giống |
-| DEP-06 | Tạo một dự án, tắt cụm bằng `down`, bật lại, dự án vẫn còn |
-| DEP-07 | Tệp `.env` không nằm trong git |
+| Đăng nhập website | `http://localhost:8080` |
+| Header bảo mật | `curl -I http://localhost:8080` |
+| HTTPS tự ký | `https://localhost:8443` |
+| pgAdmin thấy bảng `projects` | `http://127.0.0.1:5050` |
+| Dashboard Grafana | `http://127.0.0.1:3001` |
+| LogQL | Grafana Explore, datasource Loki |
 
-## 10. Xử lý sự cố thường gặp
+Dừng cụm và giữ dữ liệu: `docker compose -f deploy/docker-compose.yml down`.
+
+Xóa dữ liệu khi cố ý dựng lại: `docker compose -f deploy/docker-compose.yml down -v`.
+
+## 9. Tiêu chí nghiệm thu
+
+| Mã | Tiêu chí | Hạng mục thầy chấm |
+| --- | --- | --- |
+| DEP-01 | `docker compose up -d --build` thành công | Tổng thể |
+| DEP-02 | Website mở qua Nginx tại cổng 8080 | Nginx |
+| DEP-03 | Response có security headers | Nginx |
+| DEP-04 | `https://localhost:8443` trả cùng website bằng chứng chỉ tự ký | Nginx |
+| DEP-05 | API health qua `http://localhost:8080/api/health` | Ứng dụng |
+| DEP-06 | Đăng nhập, tạo dự án, việc và thành viên | Ứng dụng |
+| DEP-07 | pgAdmin kết nối server `postgres` và thấy dữ liệu vừa tạo | Database |
+| DEP-08 | Cổng 5432 không mở trên host | Hardening |
+| DEP-09 | Grafana có dashboard container, Nginx và PostgreSQL có số liệu | Giám sát |
+| DEP-10 | Ba câu LogQL trả kết quả | Log |
+| DEP-11 | `api` và `gateway` không chạy bằng root | Hardening |
+| DEP-12 | Tắt bằng `down` rồi bật lại, dự án vẫn còn | Database |
+| DEP-13 | `.env` không nằm trong git | Hardening |
+
+## 10. Sự cố thường gặp
 
 | Hiện tượng | Hướng xử lý |
 | --- | --- |
-| `port is already allocated` trên 8080 | Đổi `WEB_PORT` trong `.env` hoặc tắt tiến trình đang giữ cổng |
-| `api` thoát ngay | Xem log API; thường do `DATABASE_URL` sai hostname hoặc `JWT_SECRET` trống |
-| Trang web mở được nhưng gọi API lỗi | Kiểm tra `nginx.conf` đã trỏ `/api/` tới `http://api:3000` |
-| Sửa SQL mà lược đồ không đổi | Volume đã khởi tạo. Dùng `down -v` rồi `up` lại nếu được phép xóa dữ liệu |
-| Docker báo engine chưa chạy | Mở Docker Desktop, đợi engine, chạy lại `docker version` |
+| Cổng 8080, 8443, 5050 hoặc 3001 bị chiếm | Đổi cổng trong `.env` và ghi URL thật vào báo cáo |
+| pgAdmin không nối được database | Host phải là `postgres`, không phải `localhost` |
+| Grafana không có dữ liệu | Xem target trên Prometheus qua lệnh trong container, chưa cần publish cổng |
+| LogQL trống | Tạo vài request tới website rồi đợi Promtail đẩy log |
+| Trình duyệt chặn HTTPS | Chọn tiếp tục với chứng chỉ tự ký, hoặc demo HTTP kèm security headers |
+| Sửa SQL mà bảng không đổi | Volume đã khởi tạo. Chỉ dùng `down -v` khi được phép xóa dữ liệu |

@@ -11,10 +11,10 @@ Tài liệu này mô tả cách dùng hệ thống sau khi cụm Docker đã ch�
 
 ## 1. Đăng nhập lần đầu
 
-1. Mở `http://localhost:8080`.
+1. Mở `http://localhost:8080`. Trang này chỉ có form đăng nhập.
 2. Với người vận hành, đăng nhập bằng email và mật khẩu quản trị đã khai báo khi triển khai.
-3. Với người dùng thường, chọn Đăng ký, nhập họ tên, email và mật khẩu có ít nhất 8 ký tự, gồm chữ và số.
-4. Sau khi đăng ký, quay lại Đăng nhập.
+3. Nhân viên không tự đăng ký. Quản trị viên cấp tài khoản và giao email cùng mật khẩu tạm.
+4. Nhân viên đăng nhập bằng mật khẩu tạm. Hệ thống yêu cầu đổi mật khẩu trước khi vào bảng điều khiển.
 
 Phiên làm việc kéo dài 8 giờ. Hết hạn, hệ thống yêu cầu đăng nhập lại.
 
@@ -41,7 +41,7 @@ Người tạo là chủ dự án. Trạng thái ban đầu là Lên kế hoạc
 
 1. Mở dự án.
 2. Chọn Thành viên, rồi Thêm.
-3. Nhập email của tài khoản đã đăng ký.
+3. Nhập email của tài khoản đã được cấp.
 4. Chọn vai trò Thành viên hoặc Quản lý.
 5. Lưu.
 
@@ -78,6 +78,7 @@ Các sự kiện có thông báo:
 Mục này chỉ hiện với quản trị viên.
 
 - Tìm người dùng theo tên hoặc email.
+- Cấp tài khoản mới bằng họ tên, email và mật khẩu tạm, rồi giao thông tin đó cho nhân viên.
 - Khóa tài khoản để chặn đăng nhập, sau đó có thể mở lại.
 - Đổi vai trò hệ thống giữa Người dùng và Quản trị viên.
 
